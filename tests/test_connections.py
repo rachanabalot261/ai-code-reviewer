@@ -12,7 +12,7 @@ def test_gemini():
     print("Testing Google Gemini connection...")
     try:
         # HARDCODE CURE: Your Gemini key is pasted directly here
-        client = genai.Client(api_key="AQ.Ab8RN6JHXpqA-MLJdqzdK4a-65bnbZmJjHoiLE9WkzVbIBjNuA")
+        client = genai.Client(api_key="gemini key")
         
         response = client.models.generate_content(
             model="gemini-2.5-flash",
