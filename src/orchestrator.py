@@ -5,7 +5,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 from src.models import Finding, OrchestratorResult, ReviewResult
-from src.reviewers import claude_reviewer, groq_reviewer, prefilter
+from src.reviewers import gemini_reviewer, groq_reviewer, prefilter
 from src.reviewers.adjudicator import adjudicate
 
 CACHE_DIR = "findings_cache"
@@ -62,7 +62,7 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
             agreed_findings=[],
             adjudicated_findings=[],
             sole_findings=[],
-            claude_raw=ReviewResult(findings=[], summary="Skipped — no attack surface"),
+            gemini_raw=ReviewResult(findings=[], summary="Skipped — no attack surface"),
             groq_raw=ReviewResult(findings=[], summary="Skipped — no attack surface"),
             total_findings=0,
         )
@@ -71,12 +71,12 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
 
     # Run both reviewers in parallel — ThreadPoolExecutor handles blocking HTTP
     with ThreadPoolExecutor(max_workers=2) as executor:
-        claude_future = executor.submit(claude_reviewer.review, code)
+        gemini_future = executor.submit(gemini_reviewer.review, code)
         groq_future   = executor.submit(groq_reviewer.review, code)
-        claude_result = claude_future.result()
+        gemini_result = gemini_future.result()
         groq_result   = groq_future.result()
 
-    claude_sigs = {_sig(f): f for f in claude_result.findings}
+    gemini_sigs = {_sig(f): f for f in gemini_result.findings}
     groq_sigs   = {_sig(f): f for f in groq_result.findings}
 
     agreed:      list[Finding] = []
@@ -85,28 +85,28 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
     adj_sigs:    set[str]      = set()
 
     # Agreed findings: both models found it — highest confidence
-    for sig, finding in claude_sigs.items():
+    for sig, finding in gemini_sigs.items():
         if sig in groq_sigs:
             agreed.append(finding)
 
-    # Claude-only findings: adjudicate
-    for sig, finding in claude_sigs.items():
+    # Gemini-only findings: adjudicate
+    for sig, finding in gemini_sigs.items():
         if sig not in groq_sigs:
-            adj = adjudicate(code, finding, "claude")
-            if adj.correct_model in ("claude", "both_right"):
+            adj = adjudicate(code, finding, "gemini")
+            if adj.correct_model in ("gemini", "both_right"):
                 adjudicated.append(finding)
                 adj_sigs.add(sig)
 
     # Groq-only findings: adjudicate
     for sig, finding in groq_sigs.items():
-        if sig not in claude_sigs:
+        if sig not in gemini_sigs:
             adj = adjudicate(code, finding, "groq")
             if adj.correct_model in ("groq", "both_right"):
                 adjudicated.append(finding)
                 adj_sigs.add(sig)
 
     # Sole findings: adjudication said wrong but preserve at LOW confidence
-    for sig, finding in claude_sigs.items():
+    for sig, finding in gemini_sigs.items():
         if sig not in groq_sigs and sig not in adj_sigs:
             sole.append(finding)
 
@@ -116,7 +116,7 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
         agreed_findings=agreed,
         adjudicated_findings=adjudicated,
         sole_findings=sole,
-        claude_raw=claude_result,
+        gemini_raw=gemini_result,
         groq_raw=groq_result,
         total_findings=total,
     )

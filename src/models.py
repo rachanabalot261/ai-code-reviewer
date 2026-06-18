@@ -50,7 +50,7 @@ class ReviewResult(BaseModel):
 
 class AdjudicationResult(BaseModel):
     finding:       Finding
-    correct_model: str   # "claude" | "groq" | "both_wrong" | "both_right"
+    correct_model: str   # "gemini" | "groq" | "both_wrong" | "both_right"
     reasoning:     str
 
 
@@ -61,10 +61,12 @@ class OrchestratorResult(BaseModel):
     adjudicated_findings: list[Finding]
     # Sole = only one model, adjudication disagreed = LOW confidence
     sole_findings:        list[Finding]
-    claude_raw:           ReviewResult
+    gemini_raw:           ReviewResult
     groq_raw:             ReviewResult
     total_findings:       int
-
+    @property
+    def has_error(self) -> bool:
+        return self.gemini_raw.has_error or self.groq_raw.has_error
 
 class TestCase(BaseModel):
     input_value: str
