@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os, json
+from src.reviewers.gemini_throttle import throttle
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -26,6 +27,7 @@ def adjudicate(code: str, finding: Finding, source_model: str) -> AdjudicationRe
         triggering_input=finding.triggering_input,
     )
     try:
+        throttle.wait()
         response = _client.models.generate_content(
             model=MODEL,
             contents=prompt,
@@ -56,4 +58,5 @@ def adjudicate(code: str, finding: Finding, source_model: str) -> AdjudicationRe
             correct_model=source_model,
             reasoning=f"Adjudication failed ({type(e).__name__}) — kept conservatively",
             confidence=0.4,
+            errored=True,
         )

@@ -119,6 +119,7 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
         gemini_raw=gemini_result,
         groq_raw=groq_result,
         total_findings=total,
+        int=0,
     )
     _save_cache(key, result)
     return result

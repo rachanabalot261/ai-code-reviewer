@@ -52,7 +52,7 @@ class AdjudicationResult(BaseModel):
     finding:       Finding
     correct_model: str   # "gemini" | "groq" | "both_wrong" | "both_right"
     reasoning:     str
-
+    errored: bool = False
 
 class OrchestratorResult(BaseModel):
     # Agreed = both models found it = HIGH confidence
