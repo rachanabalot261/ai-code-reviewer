@@ -24,6 +24,7 @@ def review(code: str) -> ReviewResult:
 
     for attempt in range(3):
         try:
+            throttle.wait()
             response = _client.models.generate_content(
                 model=MODEL,
                 contents=prompt,
