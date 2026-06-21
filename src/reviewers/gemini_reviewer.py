@@ -2,6 +2,7 @@ from __future__ import annotations
 import os, json, time
 from dotenv import load_dotenv
 from google import genai
+from src.reviewers.gemini_throttle import throttle
 from google.genai import types
 from src.models import ReviewResult
 from src.prompts import VULNERABILITY_REVIEW_SYSTEM, VULNERABILITY_REVIEW_USER

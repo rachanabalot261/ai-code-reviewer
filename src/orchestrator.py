@@ -83,6 +83,7 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
     adjudicated: list[Finding] = []
     sole:        list[Finding] = []
     adj_sigs:    set[str]      = set()
+    adjudication_errors: int   = 0 
 
     # Agreed findings: both models found it — highest confidence
     for sig, finding in gemini_sigs.items():
@@ -93,6 +94,8 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
     for sig, finding in gemini_sigs.items():
         if sig not in groq_sigs:
             adj = adjudicate(code, finding, "gemini")
+            if adj.errored:
+                adjudication_errors += 1
             if adj.correct_model in ("gemini", "both_right"):
                 adjudicated.append(finding)
                 adj_sigs.add(sig)
@@ -101,6 +104,8 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
     for sig, finding in groq_sigs.items():
         if sig not in gemini_sigs:
             adj = adjudicate(code, finding, "groq")
+            if adj.errored:
+                adjudication_errors += 1
             if adj.correct_model in ("groq", "both_right"):
                 adjudicated.append(finding)
                 adj_sigs.add(sig)
@@ -119,7 +124,7 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
         gemini_raw=gemini_result,
         groq_raw=groq_result,
         total_findings=total,
-        int=0,
+        adjudication_errors=adjudication_errors,
     )
     _save_cache(key, result)
     return result

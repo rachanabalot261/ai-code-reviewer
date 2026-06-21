@@ -64,6 +64,7 @@ class OrchestratorResult(BaseModel):
     gemini_raw:           ReviewResult
     groq_raw:             ReviewResult
     total_findings:       int
+    adjudication_errors:  int = 0
     @property
     def has_error(self) -> bool:
         return self.gemini_raw.has_error or self.groq_raw.has_error
