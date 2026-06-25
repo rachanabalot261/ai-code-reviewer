@@ -7,8 +7,7 @@ VULN = sorted([f"samples/vulnerable/{f}"
 SAFE = sorted([f"samples/safe/{f}"
                for f in os.listdir("samples/safe") if f.endswith(".py")])
 
-tp=fp=fn=tn=0; times=[]; missed=[]; false_pos=[]
-
+tp=fp=fn=tn=skipped=0; times=[]; missed=[]; false_pos=[]
 print("\n=== VULNERABLE SAMPLES — all must have findings ===")
 for path in VULN:
     with open(path) as f: code = f.read()
@@ -29,6 +28,7 @@ for path in SAFE:
     erred = r.has_error or r.adjudication_errors > 0
     if erred:
         print(f"  ⚠️  SKIPPED (API error) {os.path.basename(path):35s}")
+        skipped += 1
     elif found:
         print(f"  ❌ FALSE POS {os.path.basename(path):35s}")
         fp += 1; false_pos.append(path)
@@ -55,7 +55,7 @@ if false_pos:
     print("\n⚠️  False positives — tighten FALSE POSITIVE RULE in prompts.py:")
     for fp_path in false_pos: print(f"   - {os.path.basename(fp_path)}")
 
-if tp == 8 and fp == 0:
+if tp == 8 and fp == 0 and skipped == 0:
     print("\n✅ EXIT GATE 1 PASSED — proceed to Step 15.")
 else:
-    print("\n🛑 EXIT GATE 1 FAILED — fix prompts.py before proceeding.")
+    print(f"\n🛑 EXIT GATE 1 FAILED — {skipped} sample(s) skipped due to API errors, rerun before trusting this.")

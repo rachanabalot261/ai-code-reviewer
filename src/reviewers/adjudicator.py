@@ -1,16 +1,17 @@
 from __future__ import annotations
 import os, json
-from src.reviewers.gemini_throttle import throttle
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+from openai import OpenAI
 from src.models import Finding, AdjudicationResult
 from src.prompts import ADJUDICATOR_SYSTEM, ADJUDICATOR_USER
 
 load_dotenv()
 
-_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-MODEL   = "gemini-2.5-flash"
+_client = OpenAI(
+    api_key=os.environ["OPENAI_API_KEY"],
+    base_url=os.environ["OPENAI_BASE_URL"],
+)
+MODEL = "anthropic/claude-sonnet-4.6"  # CONFIRM this exact slug on openrouter.ai/models before running
 
 
 def adjudicate(code: str, finding: Finding, source_model: str) -> AdjudicationResult:
@@ -27,16 +28,14 @@ def adjudicate(code: str, finding: Finding, source_model: str) -> AdjudicationRe
         triggering_input=finding.triggering_input,
     )
     try:
-        throttle.wait()
-        response = _client.models.generate_content(
+        response = _client.chat.completions.create(
             model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=ADJUDICATOR_SYSTEM,
-                response_mime_type="application/json",
-            ),
+            messages=[
+                {"role": "system", "content": ADJUDICATOR_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
         )
-        raw = response.text.strip()
+        raw = response.choices[0].message.content.strip()
         if raw.startswith("```"):
             raw = "\n".join(raw.split("\n")[1:-1])
         data    = json.loads(raw)
@@ -49,7 +48,7 @@ def adjudicate(code: str, finding: Finding, source_model: str) -> AdjudicationRe
             finding=finding,
             correct_model=correct,
             reasoning=data.get("reasoning", ""),
-            confidence=float(data.get("confidence", 0.5)),
+            errored=False,
         )
     except Exception as e:
         # Conservative: keep finding on failure
@@ -57,6 +56,5 @@ def adjudicate(code: str, finding: Finding, source_model: str) -> AdjudicationRe
             finding=finding,
             correct_model=source_model,
             reasoning=f"Adjudication failed ({type(e).__name__}) — kept conservatively",
-            confidence=0.4,
             errored=True,
         )
