@@ -7,12 +7,8 @@ from src.prompts import VULNERABILITY_REVIEW_SYSTEM, VULNERABILITY_REVIEW_USER
 
 load_dotenv()
 
-_client = OpenAI(
-    api_key=os.environ["OPENAI_API_KEY"],
-    base_url=os.environ["OPENAI_BASE_URL"],
-)
-MODEL = "anthropic/claude-sonnet-4.6"  # CONFIRM this exact slug on openrouter.ai/models before running
-
+_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])  # no base_url — defaults to OpenAI
+MODEL = "gpt-5.4-mini"
 
 def review(code: str) -> ReviewResult:
     """
