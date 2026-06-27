@@ -65,6 +65,7 @@ class OrchestratorResult(BaseModel):
     groq_raw:             ReviewResult
     total_findings:       int
     adjudication_errors:  int = 0
+    exploit_proofs:       list[ExploitProof] = []
     @property
     def has_error(self) -> bool:
         return self.gemini_raw.has_error or self.groq_raw.has_error

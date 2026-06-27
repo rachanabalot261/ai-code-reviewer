@@ -2,6 +2,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from src.sandbox_executor import run_exploit_proof
 from concurrent.futures import ThreadPoolExecutor
 
 from src.models import Finding, OrchestratorResult, ReviewResult
@@ -115,6 +116,13 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
         if sig not in groq_sigs and sig not in adj_sigs:
             sole.append(finding)
 
+    exploit_proofs = []
+    for finding in agreed + adjudicated:
+        if finding.vuln_type.value != "HARDCODED_SECRET":
+            proof = run_exploit_proof(code, finding)
+            exploit_proofs.append(proof)
+
+    total = len(agreed) + len(adjudicated) + len(sole)
     total = len(agreed) + len(adjudicated) + len(sole)
 
     result = OrchestratorResult(
@@ -125,6 +133,7 @@ def analyze(code: str, use_cache: bool = True) -> OrchestratorResult:
         groq_raw=groq_result,
         total_findings=total,
         adjudication_errors=adjudication_errors,
+        exploit_proofs=exploit_proofs,
     )
     _save_cache(key, result)
     return result
