@@ -1,0 +1,77 @@
+name: AI Security Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths: ['**.py']
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - run: pip install -r requirements.txt
+
+      - run: docker build -t sandbox-runner docker/
+
+      - id: changed
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}...HEAD -- '*.py' \
+            | grep -v '__pycache__' > changed_files.txt || true
+          echo "count=$(wc -l < changed_files.txt | tr -d ' ')" >> $GITHUB_OUTPUT
+
+      - if: steps.changed.outputs.count != '0'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - << 'EOF'
+          import os, sys
+          sys.path.insert(0, '.')
+          from src.main import analyze_file
+          from src.github.commenter import post_inline_comments, block_merge_if_critical
+          from src.models import Finding
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          pr_number = int(os.environ['GITHUB_REF'].split('/')[2])
+          commit_sha = os.environ['GITHUB_SHA']
+          has_crit = False
+          narrative = ""
+
+          with open('changed_files.txt') as f:
+              files = [l.strip() for l in f if l.strip().endswith('.py')]
+
+          for fp in files:
+              if not os.path.exists(fp):
+                  continue
+              try:
+                  r = analyze_file(fp)
+                  fs = [Finding(**f) for f in r['findings']]
+                  if fs and post_inline_comments(repo, pr_number, commit_sha, {fp: fs}):
+                      has_crit = True
+                  for c in r.get('attack_chains', []):
+                      if c.get('narrative'):
+                          narrative += c['narrative'] + '\n\n'
+              except Exception as e:
+                  print(f"Error {fp}: {e}")
+
+          if has_crit:
+              block_merge_if_critical(repo, pr_number, narrative)
+          EOF
