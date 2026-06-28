@@ -22,25 +22,46 @@ def extract_functions(code: str) -> list[tuple[str, int]]:
     return fns or [(code, 1)]
 
 
+def extract_module_context(code: str) -> str:
+    """Top-level statements outside any function (imports, constants,
+    secrets). Without these, extracted function snippets lose both the
+    names they depend on at runtime (breaking sandbox execution) and any
+    module-level vulnerability the function body never directly shows
+    (e.g. a hardcoded secret assigned above the function, not inside it)."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return ""
+    lines = code.split("\n")
+    ctx_lines = []
+    for n in tree.body:
+        if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            ctx_lines.extend(lines[n.lineno - 1:n.end_lineno])
+    return "\n".join(ctx_lines)
+
+
 def analyze_file(filepath: str, run_z3: bool = True) -> dict:
     t = time.time()
     with open(filepath, encoding="utf-8") as f:
         src = f.read()
     fns = extract_functions(src)
+    ctx_block = extract_module_context(src)
+    ctx_line_count = len(ctx_block.split("\n")) if ctx_block else 0
     all_f = []
     all_p = []
     all_z = []
 
     print(f"\n?? {filepath} - {len(fns)} function(s)")
     for code, sl in fns:
-        det = detect_and_route(code)
+        snippet = (ctx_block + "\n" + code) if ctx_block else code
+        det = detect_and_route(snippet)
         print(f"  line {sl:4d} ai={det.ai_probability:.2f} {det.routing:6s}", end="", flush=True)
         if det.routing == "SKIP":
             print()
             continue
 
-        r = orch(code)
-        off = sl - 1
+        r = orch(snippet)
+        off = (sl - 1) - ctx_line_count
         for fi in r.agreed_findings + r.adjudicated_findings + r.sole_findings:
             fi.line_start += off
             fi.line_end += off
@@ -52,7 +73,7 @@ def analyze_file(filepath: str, run_z3: bool = True) -> dict:
             print(f" [exploit:{confirmed_n}/{len(r.exploit_proofs)}]", end="")
 
         if run_z3:
-            z = verify(code)
+            z = verify(snippet)
             if z:
                 all_z.append(z)
                 print(f" [Z3:{z.status}]", end="")
