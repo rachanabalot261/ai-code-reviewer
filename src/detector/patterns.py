@@ -53,6 +53,20 @@ def xml_bare(c):
     return ("etree" in c or "minidom" in c) and "defusedxml" not in c
 
 
+@_reg("Network fetch without scheme/host validation")
+def ssrf_unvalidated(c):
+    has_fetch = any(p in c for p in ["urlopen(", "requests.get(", "requests.post(", ".get(url", "urllib.request"])
+    has_validation = any(p in c for p in ["urlparse", "ALLOWED_HOSTS", "BLOCKED_HOSTS", "hostname"])
+    return has_fetch and not has_validation
+
+
+@_reg("Unvalidated redirect target")
+def open_redirect(c):
+    has_redirect = "redirect(" in c
+    has_validation = any(p in c for p in ["urlparse", "ALLOWED_HOSTS", "netloc"])
+    return has_redirect and not has_validation
+
+
 def score(code: str) -> tuple[float, list[str]]:
     matched = [d for d, fn in PATTERNS if fn(code)]
     return min(len(matched) * 0.25, 1.0), matched
