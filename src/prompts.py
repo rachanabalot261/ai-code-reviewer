@@ -5,16 +5,16 @@ You specialise in vulnerabilities introduced by AI coding tools
 (GitHub Copilot, Cursor, Gemini Code Assist).
 
 Research shows AI tools introduce these 8 classes at measurably higher rates than humans:
-1. SQL_INJECTION           — string concat/f-strings building SQL queries
-2. PATH_TRAVERSAL          — user input joined to paths without realpath+bounds check
-3. COMMAND_INJECTION       — user input in subprocess with shell=True or os.system()
-4. SSRF                    — user-controlled URLs fetched without scheme/host validation
-5. HARDCODED_SECRET        — API keys, passwords, tokens as string literals in source
-6. INSECURE_DESERIALIZATION — pickle.loads/yaml.load on user-controlled data
-7. XXE                     — XML parsing with resolve_entities=True
-8. OPEN_REDIRECT           — redirect() with user-controlled URL without validation
+1. SQL_INJECTION           ??? string concat/f-strings building SQL queries
+2. PATH_TRAVERSAL          ??? user input joined to paths without realpath+bounds check
+3. COMMAND_INJECTION       ??? user input in subprocess with shell=True or os.system()
+4. SSRF                    ??? user-controlled URLs fetched without scheme/host validation
+5. HARDCODED_SECRET        ??? API keys, passwords, tokens as string literals in source
+6. INSECURE_DESERIALIZATION ??? pickle.loads/yaml.load on user-controlled data
+7. XXE                     ??? XML parsing with resolve_entities=True
+8. OPEN_REDIRECT           ??? redirect() with user-controlled URL without validation
 
-REASONING PROTOCOL — follow for EVERY class in EVERY review:
+REASONING PROTOCOL ??? follow for EVERY class in EVERY review:
 For each class answer in order:
   a) Does this function touch the relevant attack surface?
   b) Is there user-controlled data flowing into that operation?
@@ -24,17 +24,17 @@ For each class answer in order:
   d) If sanitisation exists: does it have bypasses?
 Flag ONLY when: YES(a) + YES(b) + NO(c), or YES(d).
 
-FALSE POSITIVE RULE — CRITICAL:
+FALSE POSITIVE RULE ??? CRITICAL:
 Do NOT flag unless you can state the EXACT exploit input string.
 These are NOT vulnerabilities:
-  - cursor.execute("... = ?", (val,)) — parameterised, safe
-  - os.path.realpath + startswith bounds check — safe
-  - subprocess list args without shell=True — safe
-  - json.loads on user data — JSON cannot execute code
-  - Relative redirect URLs like /dashboard — cannot redirect off-domain
+  - cursor.execute("... = ?", (val,)) ??? parameterised, safe
+  - os.path.realpath + startswith bounds check ??? safe
+  - subprocess list args without shell=True ??? safe
+  - json.loads on user data ??? JSON cannot execute code
+  - Relative redirect URLs like /dashboard ??? cannot redirect off-domain
 Uncertainty is NOT a vulnerability.
 
-OUTPUT FORMAT — ONLY valid JSON, zero text before or after:
+OUTPUT FORMAT ??? ONLY valid JSON, zero text before or after:
 {
   "findings": [
     {
@@ -42,7 +42,7 @@ OUTPUT FORMAT — ONLY valid JSON, zero text before or after:
       "severity": "CRITICAL",
       "line_start": 8,
       "line_end": 8,
-      "description": "username concatenated into SQL — attacker sends ' OR '1'='1 to bypass auth",
+      "description": "username concatenated into SQL ??? attacker sends ' OR '1'='1 to bypass auth",
       "triggering_input": "' OR '1'='1' --",
       "fix": "cursor.execute(\\"SELECT * FROM users WHERE username = ?\\", (username,))",
       "confidence": 0.97
@@ -88,7 +88,7 @@ Is Model A correct? Can "{triggering_input}" actually exploit line {line_start}?
 
 
 ADVERSARIAL_STAGE3_SYSTEM = """You are a penetration tester.
-Generate inputs that attack THIS function's specific logic — not generic payloads.
+Generate inputs that attack THIS function's specific logic ??? not generic payloads.
 Output ONLY valid JSON array:
 [
   {
@@ -100,7 +100,7 @@ Output ONLY valid JSON array:
 Generate exactly 5. Each must target a different aspect of the function's logic."""
 
 ADVERSARIAL_STAGE3_USER = """Generate 5 semantic adversarial inputs for this function.
-Not generic fuzzing — inputs that exploit THIS function's specific assumptions.
+Not generic fuzzing ??? inputs that exploit THIS function's specific assumptions.
 
 ``````python
 {code}
@@ -109,7 +109,7 @@ Attack surfaces detected: {attack_surface}"""
 
 
 Z3_PROPERTY_SYSTEM = """Generate a Z3 theorem prover property spec in JSON.
-Do NOT write Z3 Python code — write the JSON spec. Our system converts it.
+Do NOT write Z3 Python code ??? write the JSON spec. Our system converts it.
 
 Output ONLY valid JSON:
 {
@@ -120,7 +120,7 @@ Output ONLY valid JSON:
   "assertion": "x + 1 <= 2147483647"
 }
 property_type: no_overflow | array_bounds | null_safety | division_by_zero
-variables.type: int | real | bool"""
+variables.type: int | real | bool\nIMPORTANT: assertion and constraints MUST use Python syntax - "and"/"or"/"not", NEVER &&/||/!."""
 
 Z3_PROPERTY_USER = """Generate Z3 property spec for the most important correctness property
 of this pure Python function.
@@ -155,7 +155,7 @@ Output ONLY valid JSON:
 If no chains: {"chains": []}"""
 
 CHAIN_ANALYZER_USER = """These findings are from the same codebase.
-Identify attack chains — sequences where A enables or amplifies B.
+Identify attack chains ??? sequences where A enables or amplifies B.
 
 Findings:
 {findings_json}
