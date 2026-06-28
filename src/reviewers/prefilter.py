@@ -1,21 +1,22 @@
+"""
+Pre-filter: fast binary check before expensive dual-LLM review.
+Fails OPEN on any error - never skips a function due to API failure.
+"""
 from __future__ import annotations
-import os
-import json
+import os, json
 from dotenv import load_dotenv
-from groq import Groq
+from openai import OpenAI
 
 load_dotenv()
 
-_client = Groq(api_key=os.environ["GROQ_API_KEY"])
-MODEL   = "llama-3.1-8b-instant"
+_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+MODEL = "gpt-5.4-mini"
 
-_SYSTEM = """Respond ONLY with valid JSON: \
-{"has_attack_surface": true/false, "surfaces": ["SQL", "FILESYSTEM", ...]}
-Attack surfaces to check for: SQL (database queries), FILESYSTEM (file read/write), \
-SHELL (subprocess/os.system), NETWORK (HTTP/socket calls), \
-SERIALIZATION (pickle/yaml), XML (xml parsing), REDIRECT (flask redirect/302)."""
+_SYS = """Respond ONLY with JSON: {"has_attack_surface": true/false, "surfaces": [...]}
+Surfaces to check: SQL | FILESYSTEM | SHELL | NETWORK | SERIALIZATION | XML | REDIRECT
+If none apply: {"has_attack_surface": false, "surfaces": []}"""
 
-_USER = """Does this Python function touch any of these attack surfaces?
+_USR = """Does this Python function touch any attack surface?
 ```python
 {code}
 ```"""
@@ -23,24 +24,22 @@ _USER = """Does this Python function touch any of these attack surfaces?
 
 def has_attack_surface(code: str) -> tuple[bool, list[str]]:
     """
-    Fast free check: does this function touch any attack surface?
-    Returns (bool, list_of_surfaces).
-    On ANY error: returns (True, []) — fail open so nothing is skipped due to API errors.
-    This is intentional. Never skip a function because the filter API call failed.
+    Returns (has_surface, surfaces).
+    FAILS OPEN on any error - always returns (True, []) on failure.
+    Cost of missing a vulnerability >> cost of one unnecessary call.
     """
     try:
         response = _client.chat.completions.create(
             model=MODEL,
-            max_tokens=100,
-            temperature=0,
             messages=[
-                {"role": "system", "content": _SYSTEM},
-                {"role": "user",   "content": _USER.format(code=code)},
+                {"role": "system", "content": _SYS},
+                {"role": "user", "content": _USR.format(code=code)},
             ],
-            response_format={"type": "json_object"},
         )
-        data = json.loads(response.choices[0].message.content)
-        return data.get("has_attack_surface", True), data.get("surfaces", [])
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = "\n".join(raw.split("\n")[1:-1])
+        data = json.loads(raw)
+        return bool(data.get("has_attack_surface", True)), list(data.get("surfaces", []))
     except Exception:
-        # Fail open — always better to over-analyse than miss a vulnerability
-        return True, []
+        return True, []  # Fail open - always
